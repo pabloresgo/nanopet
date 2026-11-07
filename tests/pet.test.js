@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CONFIG, FOODS, createPet, tick, tickOne, advance, feed, play, clean, medicine,
-  toggleLights, canPlayMiniGame, rewardMiniGame, moodFor, appearance, cleanName,
+  CONFIG, FOODS, createPet, tick, tickOne, advance, feed, clean, medicine,
+  toggleLights, canPlay, rewardFetch, rewardMiniGame, moodFor, appearance, cleanName, foodCost,
 } from '../js/pet.js';
 import { petSVG, MOODS } from '../js/pet-art.js';
 
@@ -42,50 +42,14 @@ test('an exhausted pet falls asleep and wakes when rested', () => {
   assert.equal(rested.lightsOff, false);
 });
 
-test('feeding a meal is free; snacks cost coins', () => {
-  const hungry = pet({ fullness: 20, coins: 4 });
-  const meal = feed(hungry, 'meal');
-  assert.ok(meal.ok);
-  assert.equal(meal.state.fullness, 20 + FOODS.meal.fullness);
-  assert.equal(meal.state.coins, 4);
-  assert.equal(meal.effect, 'eat');
-  assert.equal(feed(hungry, 'snack').state.coins, 1);
-  assert.equal(feed(hungry, 'treat').ok, false);
-});
-
 test('a full pet refuses food', () => {
   assert.equal(feed(pet({ fullness: 98 })).ok, false);
-});
-
-test('a sleeping pet refuses actions except lights', () => {
-  const sleeping = pet({ asleep: true, lightsOff: true, fullness: 20, poop: 2 });
-  assert.equal(feed(sleeping).ok, false);
-  assert.equal(play(sleeping).ok, false);
-  assert.equal(clean(sleeping).ok, false);
-  const woken = toggleLights(sleeping);
-  assert.ok(woken.ok);
-  assert.equal(woken.state.asleep, false);
-  assert.equal(woken.effect, 'wake');
 });
 
 test('lights off puts the pet to sleep', () => {
   const result = toggleLights(pet());
   assert.equal(result.state.asleep, true);
   assert.equal(result.state.lightsOff, true);
-});
-
-test('play raises happiness and uses energy; too tired refuses', () => {
-  const result = play(pet({ happiness: 50 }));
-  assert.equal(result.state.happiness, 65);
-  assert.equal(result.state.energy, 100 - CONFIG.playEnergyCost);
-  assert.equal(play(pet({ energy: 5 })).ok, false);
-});
-
-test('mini-game needs energy and pays coins for score', () => {
-  assert.equal(canPlayMiniGame(pet({ energy: 5 })).ok, false);
-  const reward = rewardMiniGame(pet({ coins: 2 }), 7);
-  assert.equal(reward.state.coins, 9);
-  assert.equal(reward.detail.coins, 7);
 });
 
 test('clean removes poop and restores hygiene', () => {
@@ -106,19 +70,6 @@ test('poop and sickness can appear', () => {
   const next = tick(pet({ hygiene: 25 }), 5, always);
   assert.ok(next.poop > 0);
   assert.equal(next.sick, true);
-});
-
-test('a starving, sick pet loses health and dies', () => {
-  const doomed = pet({ fullness: 0, sick: true, health: 5 });
-  const next = tick(doomed, 10, never);
-  assert.equal(next.alive, false);
-});
-
-test('actions do nothing once the pet has died', () => {
-  const dead = pet({ alive: false });
-  for (const action of [feed, play, clean, medicine, toggleLights]) {
-    assert.equal(action(dead).ok, false);
-  }
 });
 
 test('stages advance with age', () => {
@@ -175,4 +126,89 @@ test('cat and dog art differ, and adults are taller than babies', () => {
   assert.notEqual(petSVG({ species: 'cat' }), petSVG({ species: 'dog' }));
   const headY = (svg) => Number(svg.match(/<circle cx="100" cy="([\d.]+)" r="4[02]"/)[1]);
   assert.ok(headY(petSVG({ species: 'cat', stage: 'adult' })) < headY(petSVG({ species: 'cat', stage: 'baby' })));
+});
+
+test('sleeping with lights off refills energy in under 20 minutes', () => {
+  const tired = pet({ energy: 0, asleep: true, lightsOff: true });
+  const later = tick(tired, 17, never);
+  assert.equal(later.energy, 100);
+  assert.equal(later.asleep, false, 'wakes up on its own when rested');
+});
+
+test('hygiene and health drop noticeably when the pet is neglected', () => {
+  const later = tick(pet(), 60, never);
+  assert.ok(later.hygiene <= 100 - 60 * 0.6 + 0.001, `hygiene ${later.hygiene}`);
+  const neglected = pet({ fullness: 5, hygiene: 10, happiness: 10 });
+  assert.ok(tick(neglected, 10, never).health <= 100 - 10 * 3 * CONFIG.health.lossPerProblem + 0.001);
+});
+
+test('health only recovers when every stat is fine', () => {
+  assert.ok(tickOne(pet({ health: 50 }), never).health > 50);
+  assert.ok(tickOne(pet({ health: 50, happiness: 40 }), never).health === 50);
+});
+
+test('a sick, starving pet dies', () => {
+  const doomed = pet({ fullness: 0, sick: true, health: 3 });
+  assert.equal(tick(doomed, 10, never).alive, false);
+});
+
+test('free meals run out, then meals cost coins', () => {
+  let state = pet({ fullness: 0, coins: 5 });
+  for (let i = 0; i < CONFIG.freeMeals.max; i += 1) {
+    const result = feed({ ...state, fullness: 0 }, 'meal');
+    assert.ok(result.ok);
+    assert.equal(result.detail.free, true);
+    state = result.state;
+  }
+  assert.equal(state.freeMeals, 0);
+  assert.equal(state.coins, 5);
+  assert.equal(foodCost(state, 'meal'), CONFIG.freeMeals.mealCostWhenOut);
+  const paid = feed({ ...state, fullness: 0 }, 'meal');
+  assert.equal(paid.state.coins, 5 - CONFIG.freeMeals.mealCostWhenOut);
+  assert.equal(feed({ ...state, fullness: 0, coins: 0 }, 'meal').ok, false);
+});
+
+test('free meals refill over time, up to the maximum', () => {
+  const empty = pet({ freeMeals: 0, mealRefillIn: CONFIG.freeMeals.refillMinutes });
+  assert.equal(tick(empty, CONFIG.freeMeals.refillMinutes, never).freeMeals, 1);
+  const full = tick(empty, CONFIG.freeMeals.refillMinutes * 10, never);
+  assert.equal(full.freeMeals, CONFIG.freeMeals.max);
+});
+
+test('snacks cost coins and treats cost a little health', () => {
+  const hungry = pet({ fullness: 20, coins: 4 });
+  assert.equal(feed(hungry, 'snack').state.coins, 1);
+  assert.equal(feed(hungry, 'treat').ok, false);
+  const rich = pet({ fullness: 20, coins: 10 });
+  assert.equal(feed(rich, 'treat').state.health, 100 + FOODS.treat.health);
+  assert.ok(feed(rich, 'meal').state.hygiene < 100, 'eating makes a little mess');
+});
+
+test('a sleeping pet refuses actions except lights', () => {
+  const sleeping = pet({ asleep: true, lightsOff: true, fullness: 20, poop: 2 });
+  assert.equal(feed(sleeping).ok, false);
+  assert.equal(canPlay(sleeping).ok, false);
+  assert.equal(clean(sleeping).ok, false);
+  const woken = toggleLights(sleeping);
+  assert.ok(woken.ok);
+  assert.equal(woken.state.asleep, false);
+});
+
+test('games need energy and pay coins, costing energy and hygiene', () => {
+  assert.equal(canPlay(pet({ energy: 5 }), 'fetch').ok, false);
+  assert.equal(canPlay(pet({ energy: 18 }), 'miniGame').ok, false);
+  const fetch = rewardFetch(pet({ coins: 2, happiness: 50 }), 9);
+  assert.equal(fetch.state.coins, 11);
+  assert.equal(fetch.state.happiness, 50 + CONFIG.fetch.maxHappiness); // capped
+  assert.equal(fetch.state.hygiene, 100 - CONFIG.fetch.hygieneCost);
+  assert.equal(fetch.detail.coins, 9);
+  assert.equal(rewardMiniGame(pet({ coins: 0 }), 5).state.coins, 5);
+});
+
+test('actions do nothing once the pet has died', () => {
+  const dead = pet({ alive: false });
+  for (const action of [feed, clean, medicine, toggleLights, canPlay]) {
+    assert.equal(action(dead).ok, false);
+  }
+  assert.equal(rewardFetch(dead, 5).ok, false);
 });

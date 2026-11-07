@@ -6,12 +6,14 @@ Play it at https://pabloresgo.github.io/nanopet/
 
 ## How to play
 
-- **Feed** opens a food menu: a free **Meal**, or a **Snack** or **Treat** that cost coins and make your pet happier.
-- **Play** offers a quick game of ball, or **Catch the treats**, a 20-second mini-game that earns coins (⭐ is worth 3).
-- **Clean** removes poop and gives a bath.
+- **Feed** opens a food menu. You get up to **3 free meals**, and one refills every 30 minutes; after that a meal costs 2 coins. **Snacks** and **Treats** cost coins and make your pet happier (treats cost a little health).
+- **Play** offers two games that earn coins:
+  - **Fetch**: 5 throws. Tap when the power needle is in the green zone. Perfect = 3, Good = 2, Weak = 1, and back-to-back Perfects add a 🔥 bonus.
+  - **Catch the treats**: 20 seconds to catch falling treats (⭐ is worth 3).
+- **Clean** removes poop and gives a bath. Playing, eating and time all make your pet dirtier.
 - **Medicine** cures sickness and restores health.
-- **Sleep / Wake** turns the lights off and on. Pets rest faster in the dark, and fall asleep on their own when exhausted.
-- Five meters show **Hunger, Happy, Energy, Clean and Health**. If health runs out, your pet passes away.
+- **Sleep / Wake** turns the lights off and on. Asleep in the dark, energy refills in about 15 minutes and your pet wakes up on its own.
+- Five meters show **Hunger, Happy, Energy, Clean and Health**. Health drops while your pet is sick, starving, dirty, exhausted or very sad, and only recovers when everything is fine. If it runs out, your pet passes away.
 - Your pet grows from **baby** to **child** (1 hour) to **adult** (4 hours). A well-cared-for adult wears a bow or bandana.
 - Time keeps passing while the page is closed. Progress is saved in your browser.
 - Add `?fast` to the URL to make one game minute pass every second, which is handy for testing.
@@ -48,6 +50,7 @@ css/style.css       theme, layout, room scene, dialogs
 css/pet.css         pet animations (moods, actions, effects)
 js/pet.js           game rules (no DOM)
 js/pet-art.js       builds the cat and dog SVG for each stage and mood
+js/fetch.js         "Fetch" rules and canvas runner
 js/minigame.js      "Catch the treats" rules and canvas runner
 js/sound.js         sound effects (Web Audio, no files)
 js/storage.js       save/load in localStorage

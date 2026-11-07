@@ -1,6 +1,6 @@
 // DOM rendering: screens, the room scene, meters, menus, effects and toasts.
 import { petSVG } from './pet-art.js';
-import { appearance, FOODS, STATS } from './pet.js';
+import { appearance, FOODS, STATS, foodCost } from './pet.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const SCREENS = ['adopt', 'home', 'farewell'];
@@ -77,6 +77,10 @@ export function renderHome(state) {
     $('.track', meter).setAttribute('aria-valuenow', String(value));
     meter.dataset.level = meterLevel(value);
   }
+
+  const energyMeter = $('.meter[data-stat="energy"]');
+  energyMeter.classList.toggle('charging', state.asleep);
+  $('.meter-label', energyMeter).textContent = state.asleep ? 'Recharging…' : 'Energy';
 
   $('#lights-icon').textContent = state.lightsOff ? '☀️' : '🌙';
   $('#lights-label').textContent = state.lightsOff ? 'Wake' : 'Sleep';
@@ -175,22 +179,36 @@ export function renderFoodMenu(state) {
   const container = $('#food-options');
   container.innerHTML = '';
   for (const [key, food] of Object.entries(FOODS)) {
+    const cost = foodCost(state, key);
+    let price = cost ? `🪙 ${cost}` : 'Free';
+    if (key === 'meal') {
+      price += state.freeMeals > 0
+        ? `<small>${state.freeMeals} free left</small>`
+        : `<small>next free in ${state.mealRefillIn} min</small>`;
+    }
+    const effects = [`+${food.fullness} hunger`, `+${food.happiness} happy`];
+    if (food.health < 0) effects.push(`${food.health} health`);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'option';
     button.dataset.food = key;
-    button.disabled = state.coins < food.cost;
+    button.disabled = state.coins < cost;
     button.innerHTML =
       `<span class="option-icon" aria-hidden="true">${food.icon}</span>` +
-      `<span class="option-text"><strong>${food.label}</strong><small>+${food.fullness} hunger, +${food.happiness} happy</small></span>` +
-      `<span class="option-cost">${food.cost ? `🪙 ${food.cost}` : 'Free'}</span>`;
+      `<span class="option-text"><strong>${food.label}</strong><small>${effects.join(', ')}</small></span>` +
+      `<span class="option-cost">${price}</span>`;
     container.append(button);
   }
 }
 
-export function updateGameHud(game) {
-  $('#game-score').textContent = game.score;
-  $('#game-time').textContent = Math.ceil(game.timeLeft / 1000);
+export function setGameDialog({ title, help }) {
+  $('#game-title').textContent = title;
+  $('#game-help').textContent = help;
+}
+
+export function updateGameHud(score, extra) {
+  $('#game-score').textContent = score;
+  $('#game-extra').textContent = extra;
 }
 
 // ---- Farewell ----

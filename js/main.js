@@ -4,6 +4,7 @@ import { loadPet, savePet, clearPet } from './storage.js';
 import * as UI from './ui.js';
 import { sound } from './sound.js';
 import { runMiniGame } from './minigame.js';
+import { runFetch, FETCH } from './fetch.js';
 
 // One game minute = one real minute. Add ?fast to the URL for one game minute per second.
 const FAST = new URLSearchParams(location.search).has('fast');
@@ -22,6 +23,12 @@ function commit(next, effect, detail) {
   savePet(state);
   UI.renderHome(state);
   if (effect) UI.playEffect(effect, detail);
+
+  if (prev && prev.asleep && !state.asleep && state.alive && !effect) {
+    UI.playEffect('wake');
+    sound.play('wake');
+    UI.toast(`${state.name} woke up refreshed! ☀️`);
+  }
 
   if (prev && prev.alive && state.alive && prev.stage !== state.stage) {
     setTimeout(() => {
@@ -113,7 +120,7 @@ function setupActions() {
           }
           break;
         case 'play':
-          if (state.asleep || !state.alive) perform(Pet.play);
+          if (state.asleep || !state.alive) perform(Pet.canPlay);
           else UI.openDialog('play-dialog');
           break;
         case 'clean':
@@ -141,8 +148,7 @@ function setupActions() {
   document.querySelectorAll('[data-play]').forEach((button) => {
     button.addEventListener('click', () => {
       UI.closeDialog('play-dialog');
-      if (button.dataset.play === 'ball') perform(Pet.play);
-      else startMiniGame();
+      startGame(button.dataset.play === 'fetch' ? 'fetch' : 'treats');
     });
   });
 
@@ -163,26 +169,49 @@ function setupActions() {
   $('#adopt-again').addEventListener('click', startOver);
 }
 
-// ---- Mini-game ----
+// ---- Mini-games ----
 
-function startMiniGame() {
+const GAMES = {
+  fetch: {
+    title: 'Fetch',
+    help: 'Tap or press Space when the needle is in the green. Perfect throws in a row earn a 🔥 bonus.',
+    rules: 'fetch',
+    run: runFetch,
+    reward: Pet.rewardFetch,
+    hud: (game) => [game.points, `🎾 ${FETCH.throws - game.throwIndex} left`],
+    start: [0, `🎾 ${FETCH.throws} left`],
+  },
+  treats: {
+    title: 'Catch the treats',
+    help: 'Drag, tap or use ← → to move. ⭐ is worth 3.',
+    rules: 'miniGame',
+    run: (canvas, options) => runMiniGame(canvas, { species: options.state.species, ...options }),
+    reward: Pet.rewardMiniGame,
+    hud: (game) => [game.score, `⏱ ${Math.ceil(game.timeLeft / 1000)} s`],
+    start: [0, '⏱ 20 s'],
+  },
+};
+
+function startGame(name) {
   catchUp();
-  const check = Pet.canPlayMiniGame(state);
+  const game = GAMES[name];
+  const check = Pet.canPlay(state, game.rules);
   if (!check.ok) {
     sound.play('nope');
     UI.toast(check.reason);
     return;
   }
+  UI.setGameDialog(game);
+  UI.updateGameHud(...game.start);
   UI.openDialog('game-dialog');
-  UI.updateGameHud({ score: 0, timeLeft: 20_000 });
-  miniGame = runMiniGame($('#game-canvas'), {
-    species: state.species,
-    onTick: UI.updateGameHud,
-    onEnd: (score) => {
+  miniGame = game.run($('#game-canvas'), {
+    state,
+    onTick: (g) => UI.updateGameHud(...game.hud(g)),
+    onEnd: (points) => {
       miniGame = null;
       UI.closeDialog('game-dialog');
-      if (perform(Pet.rewardMiniGame, score)) {
-        UI.toast(score > 0 ? `You caught ${score} points: +${score} coins!` : 'No treats caught this time.');
+      if (perform(game.reward, points)) {
+        UI.toast(points > 0 ? `${state.name} had fun! +${points} coins 🪙` : 'No points this time. Try again!');
       }
     },
   });

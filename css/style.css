@@ -294,6 +294,13 @@ h1, h2 { margin: 0; line-height: 1.15; }
 .meter[data-level="bad"] .fill { background: var(--bad); }
 .meter[data-level="bad"] .meter-icon { animation: bob 0.9s ease-in-out infinite; }
 .meter[data-stat="health"] { grid-column: 1 / -1; }
+.meter.charging .fill {
+  background: repeating-linear-gradient(-45deg, #6cc985 0 10px, #8fe0a5 10px 20px);
+  background-size: 28px 28px;
+  animation: charge 0.8s linear infinite;
+}
+.meter.charging .meter-label { color: #2f9e57; }
+@keyframes charge { to { background-position: 28px 0; } }
 
 /* Action bar: pinned to the bottom on phones */
 .actionbar {
@@ -382,7 +389,8 @@ dialog::backdrop { background: rgba(30, 20, 15, 0.45); }
 .option-icon { font-size: 2rem; }
 .option-text { display: grid; }
 .option-text small { color: var(--muted); }
-.option-cost { font-weight: 800; white-space: nowrap; }
+.option-cost { font-weight: 800; white-space: nowrap; text-align: right; }
+.option-cost small { display: block; font-weight: 600; color: var(--muted); font-size: 0.75rem; }
 
 .game-dialog {
   border: 0;

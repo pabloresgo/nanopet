@@ -124,13 +124,13 @@
   <dialog id="play-dialog" class="sheet" aria-labelledby="play-title">
     <h2 id="play-title">Let's play!</h2>
     <div class="sheet-options">
-      <button class="option" type="button" data-play="ball">
+      <button class="option" type="button" data-play="fetch">
         <span class="option-icon" aria-hidden="true">🎾</span>
-        <span class="option-text"><strong>Play ball</strong><small>Quick fun. +Happy, −Energy</small></span>
+        <span class="option-text"><strong>Fetch</strong><small>5 throws. Time them right to earn coins!</small></span>
       </button>
       <button class="option" type="button" data-play="game">
         <span class="option-icon" aria-hidden="true">🎮</span>
-        <span class="option-text"><strong>Catch the treats</strong><small>20-second game. Earn coins!</small></span>
+        <span class="option-text"><strong>Catch the treats</strong><small>20 seconds. Each treat is a coin!</small></span>
       </button>
     </div>
     <button class="btn btn-ghost" type="button" data-close>Cancel</button>
@@ -141,10 +141,10 @@
     <div class="game-hud">
       <h2 id="game-title">Catch the treats</h2>
       <span class="chip">⭐ <span id="game-score">0</span></span>
-      <span class="chip">⏱ <span id="game-time">20</span>s</span>
+      <span id="game-extra" class="chip">⏱ 20 s</span>
     </div>
-    <canvas id="game-canvas" class="game-canvas" aria-label="Mini-game: drag or use the arrow keys to catch treats"></canvas>
-    <p class="game-help">Drag, tap or use ← → to move. ⭐ is worth 3.</p>
+    <canvas id="game-canvas" class="game-canvas" aria-label="Mini-game"></canvas>
+    <p id="game-help" class="game-help"></p>
     <button id="game-quit" class="btn btn-ghost" type="button">Stop</button>
   </dialog>
 

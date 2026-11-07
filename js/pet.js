@@ -8,31 +8,32 @@ export const STATS = ['fullness', 'happiness', 'energy', 'hygiene', 'health'];
 export const CONFIG = {
   maxStat: 100,
   // Change per game minute.
-  awake: { fullness: -0.5, happiness: -0.3, energy: -0.35, hygiene: -0.2 },
-  asleep: { fullness: -0.2, happiness: -0.05, energy: 1.2, hygiene: -0.1 },
-  asleepLightsOnEnergy: 0.5,
-  poopChancePerMinute: 0.02,
+  awake: { fullness: -0.5, happiness: -0.3, energy: -0.5, hygiene: -0.6 },
+  asleep: { fullness: -0.2, happiness: -0.05, energy: 6, hygiene: -0.1 },
+  asleepLightsOnEnergy: 2,
+  poopChancePerMinute: 0.03,
   poopHygieneCost: 15,
   maxPoop: 4,
   sickChancePerMinute: 0.02,
-  sickHygieneThreshold: 30,
+  sickHygieneThreshold: 40,
   sickFullnessThreshold: 10,
-  health: { sickLoss: 0.5, starvingLoss: 0.5, dirtyLoss: 0.2, dirtyThreshold: 20, recovery: 0.2 },
+  // Health drops for each problem at once, and only recovers when every stat is fine.
+  health: { lossPerProblem: 0.4, starving: 10, dirty: 30, exhausted: 10, sad: 15, recovery: 0.1 },
+  eatingHygieneCost: 3,
+  freeMeals: { max: 3, refillMinutes: 30, mealCostWhenOut: 2 },
   stageAges: { child: 60, adult: 240 }, // in game minutes
   careThreshold: 120,
   startingCoins: 10,
   maxNameLength: 16,
   maxCatchUpMinutes: 7 * 24 * 60,
-  playEnergyCost: 10,
-  minPlayEnergy: 15,
-  miniGameEnergyCost: 15,
-  minMiniGameEnergy: 20,
+  fetch: { minEnergy: 15, energyCost: 10, hygieneCost: 8, fullnessCost: 5, happinessPerPoint: 4, maxHappiness: 30 },
+  miniGame: { minEnergy: 20, energyCost: 15, hygieneCost: 10, fullnessCost: 5, happinessPerPoint: 2, maxHappiness: 30 },
 };
 
 export const FOODS = {
-  meal: { label: 'Meal', icon: '🍖', cost: 0, fullness: 30, happiness: 2, weight: 0.2 },
-  snack: { label: 'Snack', icon: '🍪', cost: 3, fullness: 12, happiness: 12, weight: 1 },
-  treat: { label: 'Treat', icon: '🍰', cost: 6, fullness: 6, happiness: 25, weight: 1.5 },
+  meal: { label: 'Meal', icon: '🍖', cost: 0, fullness: 30, happiness: 2, health: 0, weight: 0.2 },
+  snack: { label: 'Snack', icon: '🍪', cost: 3, fullness: 12, happiness: 12, health: 0, weight: 1 },
+  treat: { label: 'Treat', icon: '🍰', cost: 6, fullness: 6, happiness: 25, health: -2, weight: 1.5 },
 };
 
 const DEFAULT_NAMES = { cat: 'Mochi', dog: 'Biscuit' };
@@ -72,6 +73,8 @@ export function createPet(species, name, now = Date.now()) {
     lightsOff: false,
     weight: 5,
     coins: CONFIG.startingCoins,
+    freeMeals: CONFIG.freeMeals.max,
+    mealRefillIn: CONFIG.freeMeals.refillMinutes,
     care: 0,
     alive: true,
     lastUpdated: now,
@@ -103,12 +106,30 @@ export function tickOne(state, rng = Math.random) {
   }
 
   const h = CONFIG.health;
-  let healthChange = 0;
-  if (n.sick) healthChange -= h.sickLoss;
-  if (n.fullness <= 0) healthChange -= h.starvingLoss;
-  if (n.hygiene < h.dirtyThreshold) healthChange -= h.dirtyLoss;
-  if (healthChange === 0) healthChange = h.recovery;
-  n.health = clamp(n.health + healthChange);
+  const problems = [
+    n.sick,
+    n.fullness < h.starving,
+    n.hygiene < h.dirty,
+    n.energy < h.exhausted,
+    n.happiness < h.sad,
+  ].filter(Boolean).length;
+  if (problems > 0) {
+    n.health = clamp(n.health - problems * h.lossPerProblem);
+  } else if (['fullness', 'happiness', 'energy', 'hygiene'].every((key) => n[key] >= 50)) {
+    n.health = clamp(n.health + h.recovery);
+  }
+
+  // Free meals refill one at a time, also while the page is closed.
+  const meals = CONFIG.freeMeals;
+  if (n.freeMeals < meals.max) {
+    n.mealRefillIn -= 1;
+    if (n.mealRefillIn <= 0) {
+      n.freeMeals += 1;
+      n.mealRefillIn = meals.refillMinutes;
+    }
+  } else {
+    n.mealRefillIn = meals.refillMinutes;
+  }
 
   // Sleep cycle: an exhausted pet falls asleep; a rested one wakes up.
   if (!n.asleep && n.energy <= 0) {
@@ -164,69 +185,69 @@ function blocked(state, { mustBeAwake = true } = {}) {
   return null;
 }
 
+// What a food costs right now. Meals are free while free meals are left.
+export function foodCost(state, foodKey) {
+  if (foodKey === 'meal') return state.freeMeals > 0 ? 0 : CONFIG.freeMeals.mealCostWhenOut;
+  return FOODS[foodKey]?.cost ?? 0;
+}
+
 export function feed(state, foodKey = 'meal') {
   const food = FOODS[foodKey];
   if (!food) return fail(state, 'Unknown food.');
   const reason = blocked(state);
   if (reason) return fail(state, reason);
   if (state.fullness >= 95) return fail(state, `${state.name} is full!`);
-  if (state.coins < food.cost) {
-    return fail(state, `Not enough coins for a ${food.label.toLowerCase()}. Play the mini-game to earn more.`);
+  const cost = foodCost(state, foodKey);
+  if (state.coins < cost) {
+    return fail(state, `Not enough coins for a ${food.label.toLowerCase()}. Play a game to earn more.`);
   }
+  const usedFreeMeal = foodKey === 'meal' && cost === 0;
   return done(
     {
       ...state,
-      coins: state.coins - food.cost,
+      coins: state.coins - cost,
+      freeMeals: usedFreeMeal ? state.freeMeals - 1 : state.freeMeals,
       fullness: clamp(state.fullness + food.fullness),
       happiness: clamp(state.happiness + food.happiness),
+      health: clamp(state.health + food.health),
+      hygiene: clamp(state.hygiene - CONFIG.eatingHygieneCost),
       weight: round1(state.weight + food.weight),
     },
     'eat',
-    { food: foodKey },
+    { food: foodKey, free: usedFreeMeal },
   );
 }
 
-export function play(state) {
-  const reason = blocked(state);
-  if (reason) return fail(state, reason);
-  if (state.energy < CONFIG.minPlayEnergy) return fail(state, `${state.name} is too tired to play.`);
-  return done(
-    {
-      ...state,
-      happiness: clamp(state.happiness + 15),
-      energy: clamp(state.energy - CONFIG.playEnergyCost),
-      fullness: clamp(state.fullness - 5),
-      weight: round1(Math.max(1, state.weight - 0.3)),
-    },
-    'play',
-  );
-}
+const GAMES = { fetch: CONFIG.fetch, miniGame: CONFIG.miniGame };
 
-export function canPlayMiniGame(state) {
+export function canPlay(state, game = 'fetch') {
   const reason = blocked(state);
   if (reason) return fail(state, reason);
-  if (state.energy < CONFIG.minMiniGameEnergy) {
-    return fail(state, `${state.name} is too tired for a game.`);
-  }
+  if (state.energy < GAMES[game].minEnergy) return fail(state, `${state.name} is too tired to play.`);
   return { ok: true, state };
 }
 
-export function rewardMiniGame(state, score) {
+function rewardGame(state, points, rules) {
   const reason = blocked(state);
   if (reason) return fail(state, reason);
-  const coins = Math.max(0, Math.floor(score));
+  const coins = Math.max(0, Math.floor(points));
   return done(
     {
       ...state,
       coins: state.coins + coins,
-      happiness: clamp(state.happiness + Math.min(30, coins * 2)),
-      energy: clamp(state.energy - CONFIG.miniGameEnergyCost),
-      fullness: clamp(state.fullness - 5),
+      happiness: clamp(state.happiness + Math.min(rules.maxHappiness, coins * rules.happinessPerPoint)),
+      energy: clamp(state.energy - rules.energyCost),
+      hygiene: clamp(state.hygiene - rules.hygieneCost),
+      fullness: clamp(state.fullness - rules.fullnessCost),
+      weight: round1(Math.max(1, state.weight - 0.3)),
     },
     'play',
     { coins },
   );
 }
+
+export const rewardFetch = (state, points) => rewardGame(state, points, CONFIG.fetch);
+export const rewardMiniGame = (state, score) => rewardGame(state, score, CONFIG.miniGame);
 
 export function clean(state) {
   const reason = blocked(state);

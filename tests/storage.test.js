@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isValidState, loadPet, savePet, STORAGE_KEY } from '../js/storage.js';
+import { CONFIG } from '../js/pet.js';
 import { createPet } from '../js/pet.js';
 
 function memoryStorage(initial = {}) {
@@ -35,4 +36,12 @@ test('save and load round-trip, and old v1 saves are dropped', () => {
 
 test('corrupt saves load as null', () => {
   assert.equal(loadPet(memoryStorage({ [STORAGE_KEY]: '{oops' })), null);
+});
+
+test('saves made before free meals existed are upgraded, not dropped', () => {
+  const { freeMeals, mealRefillIn, ...older } = createPet('dog', 'Rex', 0);
+  const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(older) });
+  const loaded = loadPet(storage);
+  assert.equal(loaded.name, 'Rex');
+  assert.equal(loaded.freeMeals, CONFIG.freeMeals.max);
 });
