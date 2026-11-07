@@ -1,0 +1,121 @@
+:root {
+  --screen-bg: #c7f0d8;
+  --screen-ink: #1b3a2a;
+  --page-bg: #2e3440;
+  --page-ink: #eceff4;
+  --button-bg: #88c0a0;
+  --button-hover: #6fa886;
+  --bar-bg: #a3d9b5;
+  --bar-fill: #2b6b48;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page-bg: #1b1f27;
+    --page-ink: #eceff4;
+  }
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--page-bg);
+  color: var(--page-ink);
+  font-family: system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+}
+
+main {
+  width: min(100% - 32px, 360px);
+  padding: 24px 0;
+  text-align: center;
+}
+
+h1 {
+  margin: 0 0 16px;
+  letter-spacing: 0.1em;
+}
+
+#game {
+  background: var(--screen-bg);
+  color: var(--screen-ink);
+  border: 8px solid #4c566a;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+#title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+#pet-canvas {
+  width: 240px;
+  height: 180px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+  margin: 0 auto 12px;
+}
+
+.bars label {
+  display: block;
+  text-align: left;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+}
+
+.bar {
+  height: 12px;
+  background: var(--bar-bg);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.bar > div {
+  height: 100%;
+  width: 0;
+  background: var(--bar-fill);
+  transition: width 0.3s;
+}
+
+#status {
+  min-height: 3em;
+  font-size: 0.95rem;
+}
+
+.choices,
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 12px 0;
+}
+
+button {
+  font: inherit;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--button-bg);
+  color: var(--screen-ink);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+button:hover,
+button:focus-visible {
+  background: var(--button-hover);
+}
+
+button.secondary {
+  background: transparent;
+  border: 2px solid var(--screen-ink);
+  width: 100%;
+}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nanopet</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main>
+    <h1>Nanopet</h1>
+
+    <section id="chooser">
+      <p>Choose your companion:</p>
+      <div class="choices">
+        <button data-species="cat">Cat</button>
+        <button data-species="dog">Dog</button>
+      </div>
+    </section>
+
+    <section id="game" hidden>
+      <h2 id="title"></h2>
+      <canvas id="pet-canvas" width="12" height="9" aria-label="Your nanopet"></canvas>
+
+      <div class="bars">
+        <label>Fullness
+          <div class="bar"><div id="fullness-bar"></div></div>
+        </label>
+        <label>Happiness
+          <div class="bar"><div id="happiness-bar"></div></div>
+        </label>
+      </div>
+
+      <p id="status" aria-live="polite"></p>
+
+      <div class="actions">
+        <button data-action="feed">Feed</button>
+        <button data-action="play">Play</button>
+        <button data-action="clean">Clean</button>
+        <button data-action="medicine">Medicine</button>
+      </div>
+
+      <button id="reset" class="secondary">Start over</button>
+    </section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
