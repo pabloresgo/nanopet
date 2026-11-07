@@ -9,10 +9,11 @@ export function isValidState(value) {
     value !== null &&
     typeof value === 'object' &&
     SPECIES.includes(value.species) &&
-    typeof value.age === 'number' &&
-    typeof value.hunger === 'number' &&
-    typeof value.happiness === 'number' &&
-    typeof value.lastUpdated === 'number' &&
+    ['age', 'hunger', 'happiness', 'poop', 'neglect', 'care', 'lastUpdated'].every((key) =>
+      Number.isFinite(value[key]),
+    ) &&
+    ['baby', 'child', 'adult'].includes(value.stage) &&
+    typeof value.sick === 'boolean' &&
     typeof value.alive === 'boolean'
   );
 }

@@ -95,7 +95,7 @@ export function tick(state, minutes, rng = Math.random) {
 // Brings the pet up to date with the wall clock. `msPerMinute` converts real time to game time.
 export function advance(state, now, msPerMinute, rng = Math.random) {
   if (!state.alive) {
-    return { ...state, lastUpdated: now };
+    return state;
   }
   const minutes = Math.floor((now - state.lastUpdated) / msPerMinute);
   if (minutes <= 0) {

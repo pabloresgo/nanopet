@@ -111,3 +111,8 @@ test('every sprite is a rectangular grid of the same size', () => {
     }
   }
 });
+
+test('advance leaves a dead pet unchanged', () => {
+  const dead = { ...createPet('cat', 0), alive: false };
+  assert.equal(advance(dead, 10 * 60_000, 60_000, never), dead);
+});
