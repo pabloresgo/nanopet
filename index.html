@@ -2,47 +2,153 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Nanopet</title>
+  <meta name="description" content="Adopt a cat or a dog and keep it fed, happy, clean and rested.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/pet.css">
 </head>
 <body>
-  <main>
-    <h1>Nanopet</h1>
+  <div id="app">
 
-    <section id="chooser">
-      <p>Choose your companion:</p>
-      <div class="choices">
-        <button data-species="cat">Cat</button>
-        <button data-species="dog">Dog</button>
+    <!-- Adopt -->
+    <section id="screen-adopt" class="screen screen-adopt">
+      <div class="adopt-card-wrap">
+        <h1 class="logo">Nanopet <span aria-hidden="true">🐾</span></h1>
+        <p class="tagline">Adopt a tiny friend. Feed, play, clean and tuck them in.</p>
+
+        <form id="adopt-form" class="adopt-form">
+          <fieldset class="species-picker">
+            <legend>Choose your pet</legend>
+            <label class="species-option">
+              <input type="radio" name="species" value="cat" required>
+              <span class="species-card">
+                <span class="preview" data-species="cat"></span>
+                <span class="species-label">Cat</span>
+              </span>
+            </label>
+            <label class="species-option">
+              <input type="radio" name="species" value="dog" required>
+              <span class="species-card">
+                <span class="preview" data-species="dog"></span>
+                <span class="species-label">Dog</span>
+              </span>
+            </label>
+          </fieldset>
+
+          <label class="name-field">
+            <span>Name</span>
+            <input id="name-input" name="name" type="text" maxlength="16" autocomplete="off" placeholder="Give them a name">
+          </label>
+
+          <button id="adopt-button" class="btn btn-primary btn-large" type="submit" disabled>Adopt</button>
+        </form>
       </div>
     </section>
 
-    <section id="game" hidden>
-      <h2 id="title"></h2>
-      <canvas id="pet-canvas" width="12" height="9" aria-label="Your nanopet"></canvas>
+    <!-- Home -->
+    <section id="screen-home" class="screen screen-home" hidden>
+      <header class="topbar">
+        <div class="pet-id">
+          <h1 id="pet-name" class="pet-name"></h1>
+          <p id="pet-meta" class="pet-meta"></p>
+        </div>
+        <div class="topbar-actions">
+          <span class="chip coins" title="Coins"><span aria-hidden="true">🪙</span> <span id="coins">0</span></span>
+          <button id="mute-button" class="icon-btn" type="button" aria-label="Mute sound">🔊</button>
+          <button id="restart-button" class="icon-btn" type="button" aria-label="Start over">↺</button>
+        </div>
+      </header>
 
-      <div class="bars">
-        <label>Fullness
-          <div class="bar"><div id="fullness-bar"></div></div>
-        </label>
-        <label>Happiness
-          <div class="bar"><div id="happiness-bar"></div></div>
-        </label>
-      </div>
+      <main class="home-main">
+        <div id="scene" class="scene">
+          <div class="room" aria-hidden="true">
+            <div class="window"><div class="sky"><span class="sun"></span><span class="moon"></span><span class="star s1"></span><span class="star s2"></span><span class="star s3"></span></div></div>
+            <div class="frame"></div>
+            <div class="plant">🪴</div>
+            <div class="floor"></div>
+            <div class="rug"></div>
+          </div>
+          <div class="night-shade" aria-hidden="true"></div>
+          <div id="poops" class="poops" aria-hidden="true"></div>
+          <div id="pet" class="pet"></div>
+          <div id="sick-badge" class="sick-badge" hidden aria-hidden="true">🤒</div>
+          <div id="zzz" class="zzz" hidden aria-hidden="true"><span>z</span><span>z</span><span>Z</span></div>
+          <div id="fx" class="fx" aria-hidden="true"></div>
+          <p id="mood-line" class="mood-line" aria-live="polite"></p>
+        </div>
 
-      <p id="status" aria-live="polite"></p>
+        <aside class="side">
+          <div class="meters">
+            <div class="meter" data-stat="fullness"><span class="meter-icon" aria-hidden="true">🍖</span><span class="meter-label">Hunger</span><div class="track" role="meter" aria-label="Hunger" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div></div></div>
+            <div class="meter" data-stat="happiness"><span class="meter-icon" aria-hidden="true">💛</span><span class="meter-label">Happy</span><div class="track" role="meter" aria-label="Happiness" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div></div></div>
+            <div class="meter" data-stat="energy"><span class="meter-icon" aria-hidden="true">⚡</span><span class="meter-label">Energy</span><div class="track" role="meter" aria-label="Energy" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div></div></div>
+            <div class="meter" data-stat="hygiene"><span class="meter-icon" aria-hidden="true">🛁</span><span class="meter-label">Clean</span><div class="track" role="meter" aria-label="Hygiene" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div></div></div>
+            <div class="meter" data-stat="health"><span class="meter-icon" aria-hidden="true">❤️</span><span class="meter-label">Health</span><div class="track" role="meter" aria-label="Health" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div></div></div>
+          </div>
 
-      <div class="actions">
-        <button data-action="feed">Feed</button>
-        <button data-action="play">Play</button>
-        <button data-action="clean">Clean</button>
-        <button data-action="medicine">Medicine</button>
-      </div>
-
-      <button id="reset" class="secondary">Start over</button>
+          <nav class="actionbar" aria-label="Care actions">
+            <button class="action" type="button" data-action="feed"><span class="action-icon" aria-hidden="true">🍖</span><span>Feed</span></button>
+            <button class="action" type="button" data-action="play"><span class="action-icon" aria-hidden="true">🎾</span><span>Play</span></button>
+            <button class="action" type="button" data-action="clean"><span class="action-icon" aria-hidden="true">🧼</span><span>Clean</span></button>
+            <button class="action" type="button" data-action="medicine"><span class="action-icon" aria-hidden="true">💊</span><span>Medicine</span></button>
+            <button class="action" type="button" data-action="lights"><span id="lights-icon" class="action-icon" aria-hidden="true">🌙</span><span id="lights-label">Sleep</span></button>
+          </nav>
+        </aside>
+      </main>
     </section>
-  </main>
+
+    <!-- Farewell -->
+    <section id="screen-farewell" class="screen screen-farewell" hidden>
+      <div class="farewell-card">
+        <div id="farewell-pet" class="farewell-pet"></div>
+        <h1 id="farewell-title">Goodbye</h1>
+        <p id="farewell-text"></p>
+        <button id="adopt-again" class="btn btn-primary btn-large" type="button">Adopt a new friend</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Food menu -->
+  <dialog id="food-dialog" class="sheet" aria-labelledby="food-title">
+    <h2 id="food-title">What's for dinner?</h2>
+    <div id="food-options" class="sheet-options"></div>
+    <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+  </dialog>
+
+  <!-- Play menu -->
+  <dialog id="play-dialog" class="sheet" aria-labelledby="play-title">
+    <h2 id="play-title">Let's play!</h2>
+    <div class="sheet-options">
+      <button class="option" type="button" data-play="ball">
+        <span class="option-icon" aria-hidden="true">🎾</span>
+        <span class="option-text"><strong>Play ball</strong><small>Quick fun. +Happy, −Energy</small></span>
+      </button>
+      <button class="option" type="button" data-play="game">
+        <span class="option-icon" aria-hidden="true">🎮</span>
+        <span class="option-text"><strong>Catch the treats</strong><small>20-second game. Earn coins!</small></span>
+      </button>
+    </div>
+    <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+  </dialog>
+
+  <!-- Mini-game -->
+  <dialog id="game-dialog" class="game-dialog" aria-labelledby="game-title">
+    <div class="game-hud">
+      <h2 id="game-title">Catch the treats</h2>
+      <span class="chip">⭐ <span id="game-score">0</span></span>
+      <span class="chip">⏱ <span id="game-time">20</span>s</span>
+    </div>
+    <canvas id="game-canvas" class="game-canvas" aria-label="Mini-game: drag or use the arrow keys to catch treats"></canvas>
+    <p class="game-help">Drag, tap or use ← → to move. ⭐ is worth 3.</p>
+    <button id="game-quit" class="btn btn-ghost" type="button">Stop</button>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script type="module" src="js/main.js"></script>
 </body>

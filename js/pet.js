@@ -1,24 +1,44 @@
 // Pure game logic for the nanopet. No DOM access, so it can be tested in Node.
+// Every stat runs from 0 (bad) to 100 (good).
 
 export const SPECIES = ['cat', 'dog'];
+export const STAGES = ['baby', 'child', 'adult'];
+export const STATS = ['fullness', 'happiness', 'energy', 'hygiene', 'health'];
 
 export const CONFIG = {
   maxStat: 100,
-  hungerPerMinute: 0.5,
-  happinessDecayPerMinute: 0.3,
-  poopChancePerMinute: 0.03,
+  // Change per game minute.
+  awake: { fullness: -0.5, happiness: -0.3, energy: -0.35, hygiene: -0.2 },
+  asleep: { fullness: -0.2, happiness: -0.05, energy: 1.2, hygiene: -0.1 },
+  asleepLightsOnEnergy: 0.5,
+  poopChancePerMinute: 0.02,
+  poopHygieneCost: 15,
   maxPoop: 4,
   sickChancePerMinute: 0.02,
-  sickHungerThreshold: 90,
-  sickPoopThreshold: 3,
-  neglectLimitMinutes: 120,
+  sickHygieneThreshold: 30,
+  sickFullnessThreshold: 10,
+  health: { sickLoss: 0.5, starvingLoss: 0.5, dirtyLoss: 0.2, dirtyThreshold: 20, recovery: 0.2 },
   stageAges: { child: 60, adult: 240 }, // in game minutes
-  wellCareGainPerMinute: 1,
-  happyFormCareThreshold: 120,
+  careThreshold: 120,
+  startingCoins: 10,
+  maxNameLength: 16,
   maxCatchUpMinutes: 7 * 24 * 60,
+  playEnergyCost: 10,
+  minPlayEnergy: 15,
+  miniGameEnergyCost: 15,
+  minMiniGameEnergy: 20,
 };
 
+export const FOODS = {
+  meal: { label: 'Meal', icon: '🍖', cost: 0, fullness: 30, happiness: 2, weight: 0.2 },
+  snack: { label: 'Snack', icon: '🍪', cost: 3, fullness: 12, happiness: 12, weight: 1 },
+  treat: { label: 'Treat', icon: '🍰', cost: 6, fullness: 6, happiness: 25, weight: 1.5 },
+};
+
+const DEFAULT_NAMES = { cat: 'Mochi', dog: 'Biscuit' };
+
 const clamp = (value) => Math.min(CONFIG.maxStat, Math.max(0, value));
+const round1 = (value) => Math.round(value * 10) / 10;
 
 export function stageFor(age) {
   if (age >= CONFIG.stageAges.adult) return 'adult';
@@ -26,19 +46,32 @@ export function stageFor(age) {
   return 'baby';
 }
 
-export function createPet(species, now = Date.now()) {
+export function cleanName(name, species) {
+  const trimmed = String(name ?? '').trim().slice(0, CONFIG.maxNameLength);
+  return trimmed || DEFAULT_NAMES[species];
+}
+
+export function createPet(species, name, now = Date.now()) {
   if (!SPECIES.includes(species)) {
     throw new Error(`Unknown species: ${species}`);
   }
   return {
+    version: 2,
     species,
+    name: cleanName(name, species),
     age: 0,
     stage: 'baby',
-    hunger: 0,
-    happiness: CONFIG.maxStat,
+    fullness: 80,
+    happiness: 80,
+    energy: 100,
+    hygiene: 100,
+    health: 100,
     poop: 0,
     sick: false,
-    neglect: 0,
+    asleep: false,
+    lightsOff: false,
+    weight: 5,
+    coins: CONFIG.startingCoins,
     care: 0,
     alive: true,
     lastUpdated: now,
@@ -47,39 +80,52 @@ export function createPet(species, now = Date.now()) {
 
 // Advances the pet by one game minute. `rng` returns a number in [0, 1).
 export function tickOne(state, rng = Math.random) {
-  const next = { ...state };
-  next.age += 1;
-  next.stage = stageFor(next.age);
-  next.hunger = clamp(next.hunger + CONFIG.hungerPerMinute);
-  next.happiness = clamp(next.happiness - CONFIG.happinessDecayPerMinute);
+  const n = { ...state };
+  n.age += 1;
+  n.stage = stageFor(n.age);
 
-  if (rng() < CONFIG.poopChancePerMinute && next.poop < CONFIG.maxPoop) {
-    next.poop += 1;
+  const rates = n.asleep ? CONFIG.asleep : CONFIG.awake;
+  n.fullness = clamp(n.fullness + rates.fullness);
+  n.happiness = clamp(n.happiness + rates.happiness);
+  n.hygiene = clamp(n.hygiene + rates.hygiene);
+  const energyRate = n.asleep && !n.lightsOff ? CONFIG.asleepLightsOnEnergy : rates.energy;
+  n.energy = clamp(n.energy + energyRate);
+
+  if (!n.asleep && n.poop < CONFIG.maxPoop && rng() < CONFIG.poopChancePerMinute) {
+    n.poop += 1;
+    n.hygiene = clamp(n.hygiene - CONFIG.poopHygieneCost);
   }
 
   const unhealthy =
-    next.poop >= CONFIG.sickPoopThreshold || next.hunger >= CONFIG.sickHungerThreshold;
-  if (!next.sick && unhealthy && rng() < CONFIG.sickChancePerMinute) {
-    next.sick = true;
+    n.hygiene < CONFIG.sickHygieneThreshold || n.fullness < CONFIG.sickFullnessThreshold;
+  if (!n.sick && unhealthy && rng() < CONFIG.sickChancePerMinute) {
+    n.sick = true;
   }
 
-  const starving = next.hunger >= CONFIG.maxStat;
-  if (starving || next.sick) {
-    next.neglect += 1;
-  } else {
-    next.neglect = Math.max(0, next.neglect - 1);
+  const h = CONFIG.health;
+  let healthChange = 0;
+  if (n.sick) healthChange -= h.sickLoss;
+  if (n.fullness <= 0) healthChange -= h.starvingLoss;
+  if (n.hygiene < h.dirtyThreshold) healthChange -= h.dirtyLoss;
+  if (healthChange === 0) healthChange = h.recovery;
+  n.health = clamp(n.health + healthChange);
+
+  // Sleep cycle: an exhausted pet falls asleep; a rested one wakes up.
+  if (!n.asleep && n.energy <= 0) {
+    n.asleep = true;
+  } else if (n.asleep && n.energy >= CONFIG.maxStat) {
+    n.asleep = false;
+    n.lightsOff = false;
   }
 
-  const wellCared =
-    next.hunger < 50 && next.happiness > 50 && next.poop < CONFIG.sickPoopThreshold && !next.sick;
-  if (wellCared) {
-    next.care += CONFIG.wellCareGainPerMinute;
+  if (!n.sick && STATS.every((key) => n[key] >= 50)) {
+    n.care += 1;
   }
 
-  if (next.neglect >= CONFIG.neglectLimitMinutes) {
-    next.alive = false;
+  if (n.health <= 0) {
+    n.alive = false;
   }
-  return next;
+  return n;
 }
 
 // Advances the pet by a number of whole game minutes. Stops early if the pet dies.
@@ -92,7 +138,7 @@ export function tick(state, minutes, rng = Math.random) {
   return next;
 }
 
-// Brings the pet up to date with the wall clock. `msPerMinute` converts real time to game time.
+// Brings the pet up to date with the wall clock. Returns the same object if nothing changed.
 export function advance(state, now, msPerMinute, rng = Math.random) {
   if (!state.alive) {
     return state;
@@ -105,48 +151,142 @@ export function advance(state, now, msPerMinute, rng = Math.random) {
   return { ...next, lastUpdated: state.lastUpdated + minutes * msPerMinute };
 }
 
-function act(state, change) {
-  if (!state.alive) {
-    return state;
-  }
-  return change({ ...state });
+// ---- Actions ----
+// Each action returns { ok, state, effect?, detail?, reason? }.
+// `effect` names the animation and sound the UI should play.
+
+const fail = (state, reason) => ({ ok: false, state, reason });
+const done = (state, effect, detail) => ({ ok: true, state, effect, detail });
+
+function blocked(state, { mustBeAwake = true } = {}) {
+  if (!state.alive) return `${state.name} is no longer with us.`;
+  if (mustBeAwake && state.asleep) return `Shh… ${state.name} is sleeping. Turn the lights on first.`;
+  return null;
 }
 
-export function feed(state) {
-  return act(state, (s) => {
-    s.hunger = clamp(s.hunger - 25);
-    return s;
-  });
+export function feed(state, foodKey = 'meal') {
+  const food = FOODS[foodKey];
+  if (!food) return fail(state, 'Unknown food.');
+  const reason = blocked(state);
+  if (reason) return fail(state, reason);
+  if (state.fullness >= 95) return fail(state, `${state.name} is full!`);
+  if (state.coins < food.cost) {
+    return fail(state, `Not enough coins for a ${food.label.toLowerCase()}. Play the mini-game to earn more.`);
+  }
+  return done(
+    {
+      ...state,
+      coins: state.coins - food.cost,
+      fullness: clamp(state.fullness + food.fullness),
+      happiness: clamp(state.happiness + food.happiness),
+      weight: round1(state.weight + food.weight),
+    },
+    'eat',
+    { food: foodKey },
+  );
 }
 
 export function play(state) {
-  return act(state, (s) => {
-    s.happiness = clamp(s.happiness + 20);
-    s.hunger = clamp(s.hunger + 3);
-    return s;
-  });
+  const reason = blocked(state);
+  if (reason) return fail(state, reason);
+  if (state.energy < CONFIG.minPlayEnergy) return fail(state, `${state.name} is too tired to play.`);
+  return done(
+    {
+      ...state,
+      happiness: clamp(state.happiness + 15),
+      energy: clamp(state.energy - CONFIG.playEnergyCost),
+      fullness: clamp(state.fullness - 5),
+      weight: round1(Math.max(1, state.weight - 0.3)),
+    },
+    'play',
+  );
+}
+
+export function canPlayMiniGame(state) {
+  const reason = blocked(state);
+  if (reason) return fail(state, reason);
+  if (state.energy < CONFIG.minMiniGameEnergy) {
+    return fail(state, `${state.name} is too tired for a game.`);
+  }
+  return { ok: true, state };
+}
+
+export function rewardMiniGame(state, score) {
+  const reason = blocked(state);
+  if (reason) return fail(state, reason);
+  const coins = Math.max(0, Math.floor(score));
+  return done(
+    {
+      ...state,
+      coins: state.coins + coins,
+      happiness: clamp(state.happiness + Math.min(30, coins * 2)),
+      energy: clamp(state.energy - CONFIG.miniGameEnergyCost),
+      fullness: clamp(state.fullness - 5),
+    },
+    'play',
+    { coins },
+  );
 }
 
 export function clean(state) {
-  return act(state, (s) => {
-    s.poop = 0;
-    return s;
-  });
+  const reason = blocked(state);
+  if (reason) return fail(state, reason);
+  if (state.poop === 0 && state.hygiene >= 95) {
+    return fail(state, `${state.name} is already squeaky clean.`);
+  }
+  return done({ ...state, poop: 0, hygiene: CONFIG.maxStat }, 'clean');
 }
 
 export function medicine(state) {
-  return act(state, (s) => {
-    if (s.sick) {
-      s.sick = false;
-      s.happiness = clamp(s.happiness - 5);
-    }
-    return s;
-  });
+  const reason = blocked(state);
+  if (reason) return fail(state, reason);
+  if (!state.sick && state.health >= 90) return fail(state, `${state.name} doesn't need medicine.`);
+  return done(
+    {
+      ...state,
+      sick: false,
+      health: clamp(state.health + 30),
+      happiness: clamp(state.happiness - 5),
+    },
+    'medicine',
+  );
 }
 
-// The final form depends on how well the pet was cared for while growing up.
+export function toggleLights(state) {
+  const reason = blocked(state, { mustBeAwake: false });
+  if (reason) return fail(state, reason);
+  if (state.lightsOff) {
+    const grumpy = state.energy < 30;
+    return done(
+      {
+        ...state,
+        lightsOff: false,
+        asleep: false,
+        happiness: clamp(state.happiness - (grumpy ? 10 : 0)),
+      },
+      'wake',
+      { grumpy },
+    );
+  }
+  return done({ ...state, lightsOff: true, asleep: true }, 'sleep');
+}
+
+// ---- Appearance ----
+
+export function moodFor(state) {
+  if (!state.alive) return 'dead';
+  if (state.asleep) return 'sleeping';
+  if (state.sick) return 'sick';
+  if (state.fullness < 25) return 'hungry';
+  if (state.energy < 20) return 'sleepy';
+  if (state.hygiene < 30) return 'dirty';
+  if (state.happiness < 30) return 'sad';
+  if (state.happiness >= 70 && state.fullness >= 50) return 'happy';
+  return 'content';
+}
+
+// The adult's look reflects how well the pet was cared for while growing up.
 export function appearance(state) {
-  const form =
-    state.stage === 'adult' && state.care >= CONFIG.happyFormCareThreshold ? 'happy' : 'plain';
-  return { stage: state.stage, form };
+  const form = state.stage === 'adult' && state.care >= CONFIG.careThreshold ? 'happy' : 'plain';
+  return { stage: state.stage, form, mood: moodFor(state), dirty: state.hygiene < 30 };
 }
