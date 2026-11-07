@@ -48,3 +48,11 @@ js/main.js        entry point, clock and buttons
 tests/            unit and site checks
 .github/workflows CI and Pages deployment
 ```
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+## Disclaimer
+
+Nanopet is an independent fan project. It is not affiliated with, endorsed by, or sponsored by Bandai. Tamagotchi is a trademark of Bandai Co., Ltd., used here only to describe the style of game.
